@@ -28,9 +28,12 @@ export async function POST(request: Request) {
   const chatRequest = parsed.data as AiChatRequest;
   const response = enforceMindmapRoot(
     enforceLineByLineGeneration(
-      enforceManualOnlyActionDecisionKinds(
-        withDeterministicFallback(
-          await provider.chat(chatRequest),
+      enforceAdditiveContinuation(
+        enforceManualOnlyActionDecisionKinds(
+          withDeterministicFallback(
+            await provider.chat(chatRequest),
+            chatRequest,
+          ),
           chatRequest,
         ),
         chatRequest,
@@ -40,6 +43,43 @@ export async function POST(request: Request) {
     chatRequest,
   );
   return NextResponse.json(response);
+}
+
+function enforceAdditiveContinuation(
+  response: AiChatResponse,
+  request: AiChatRequest,
+): AiChatResponse {
+  if (request.chatOnly || !response.patch) return response;
+  if (request.document.nodes.length <= 1) return response;
+  if (isOrganizeIntent(request.message) || isCompleteMapRequest(request.message)) return response;
+
+  const existingNodeIds = new Set(request.document.nodes.map((node) => node.id));
+  const operations = response.patch.operations
+    .map((operation): GraphPatchOperation | null => {
+      if (operation.type === "deleteNode" && existingNodeIds.has(operation.id)) return null;
+
+      if (operation.type === "updateNode" && existingNodeIds.has(operation.id)) {
+        if (!operation.position) return null;
+        return {
+          type: "updateNode",
+          id: operation.id,
+          position: operation.position,
+        };
+      }
+
+      return operation;
+    })
+    .filter((operation): operation is GraphPatchOperation => Boolean(operation));
+
+  if (operations.length === response.patch.operations.length) return response;
+  return {
+    ...response,
+    reply: `${response.reply}\n\n我保留了已有内容，只做增量添加和结构重组。`,
+    patch: {
+      ...response.patch,
+      operations,
+    },
+  };
 }
 
 function enforceLineByLineGeneration(

@@ -702,6 +702,13 @@ export default function NeMindApp() {
     window.setTimeout(() => chatTextRef.current?.focus(), 0);
   }
 
+  function draftGrillMePrompt() {
+    setChatInput("Grill me：基于当前导图，尖锐追问我 5 个最关键的问题，逼我澄清假设、决策和下一步行动。不要修改导图。");
+    setIsChatOnlyMode(true);
+    setRightTab("chat");
+    window.setTimeout(() => chatTextRef.current?.focus(), 0);
+  }
+
   function newDocument() {
     const next = createSeedDocument();
     next.title = nextUntitledTitle(documents);
@@ -1680,6 +1687,9 @@ export default function NeMindApp() {
             </button>
             <button type="button" onClick={draftStructureTidyPrompt}>
               整理结构
+            </button>
+            <button type="button" onClick={draftGrillMePrompt}>
+              Grill me
             </button>
           </div>
           <div className="chat-input">
