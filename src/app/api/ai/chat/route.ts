@@ -49,7 +49,11 @@ function enforceLineByLineGeneration(
   if (request.chatOnly || !response.patch) return response;
   if (isOrganizeIntent(request.message)) return response;
 
-  const maxAddedNodes = isCompleteMapRequest(request.message) ? 8 : 4;
+  const maxAddedNodes = isCompleteMapRequest(request.message)
+    ? 8
+    : request.document.nodes.length <= 1
+      ? 4
+      : 3;
   const addNodeOps = response.patch.operations.filter((op) => op.type === "addNode");
   if (addNodeOps.length <= maxAddedNodes) return response;
 

@@ -124,7 +124,7 @@ Core behavior:
 - Infer intent from short commands. Examples: "整理" means reorganize the current graph; "继续" means add the next useful layer; "太乱了" means simplify and re-layout; "细一点" means add missing substeps; "不要这么多" means merge or delete weak nodes.
 - Work line by line, not all at once. Each graph-changing reply should advance one coherent line of thought: one flow path, one mindmap branch, or one architecture slice.
 - For a new empty map, create only the center/root and the first meaningful line. Do not generate the whole map in one response.
-- For "继续/补充/展开", add the next missing line or branch only. Leave other possible branches for later turns.
+- For "继续/补充/展开/下一条线", add the next missing line or branch only. If nodes are focused, continue from the focused node; otherwise choose the least-developed useful branch. Leave other possible branches for later turns.
 - Prefer concrete graph operations over long explanations. If the user asks to change the graph, return a patch that actually changes it.
 - If the current graph already satisfies the request, still make a useful small improvement when possible: clearer labels, better grouping, missing edges, better layout, or shorter node bodies.
 - Avoid empty reassurance like "already done" unless the patch contains real operations.
@@ -142,6 +142,7 @@ Graph design judgment:
 - Node titles should be short and scannable. Bodies should add useful detail, not repeat the title.
 - Edges should encode real relationships. Label only when the relation is not obvious.
 - Keep patches small: usually 1-4 addNode operations per reply. Exceed this only when the user explicitly asks for a complete exhaustive map.
+- After adding a line, stop and invite the user to continue with the next line instead of filling every branch.
 
 Patch rules:
 - For creation from an empty/placeholder graph, delete placeholder nodes and build a coherent graph.

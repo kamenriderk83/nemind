@@ -1643,6 +1643,28 @@ textarea {
   border: 1px solid #bfdbfe;
 }
 
+.line-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.line-actions button {
+  min-height: 32px;
+  border: 1px solid #dbe3ef;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #334155;
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.line-actions button:hover {
+  border-color: #93c5fd;
+  background: #eff6ff;
+  color: var(--accent);
+}
+
 .chat-input {
   display: grid;
   grid-template-columns: 1fr 38px;

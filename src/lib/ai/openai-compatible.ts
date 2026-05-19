@@ -192,7 +192,7 @@ function inferUserIntent(message: string) {
   ) {
     return "re-layout and tidy the existing graph; avoid adding unrelated content";
   }
-  if (/继续|补充|细一点|展开|more|continue|expand/.test(text)) {
+  if (/继续|补充|细一点|展开|下一条线|下一个分支|more|continue|expand/.test(text)) {
     return "extend the current graph with the next single useful line or branch only";
   }
   if (/太乱|简化|精简|少一点|simplify|reduce/.test(text)) {

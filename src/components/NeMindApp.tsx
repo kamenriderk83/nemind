@@ -684,6 +684,24 @@ export default function NeMindApp() {
     window.setTimeout(() => chatTextRef.current?.focus(), 0);
   }
 
+  function draftNextLinePrompt() {
+    setChatInput(
+      selectedNodeIds.length
+        ? "沿着选中的节点继续，只展开下一条线或一个分支，最多新增 3 个节点。"
+        : "沿着当前导图继续，只展开下一条线或一个分支，最多新增 3 个节点。",
+    );
+    setIsChatOnlyMode(false);
+    setRightTab("chat");
+    window.setTimeout(() => chatTextRef.current?.focus(), 0);
+  }
+
+  function draftStructureTidyPrompt() {
+    setChatInput("重新整理当前导图结构：传统导图只保留一个中心主题，分支清晰连接，不新增无关内容。");
+    setIsChatOnlyMode(false);
+    setRightTab("chat");
+    window.setTimeout(() => chatTextRef.current?.focus(), 0);
+  }
+
   function newDocument() {
     const next = createSeedDocument();
     next.title = nextUntitledTitle(documents);
@@ -1656,6 +1674,14 @@ export default function NeMindApp() {
               已选中 {selectedNodeIds.length} 个节点，提问将聚焦于它们
             </div>
           ) : null}
+          <div className="line-actions">
+            <button type="button" onClick={draftNextLinePrompt}>
+              下一条线
+            </button>
+            <button type="button" onClick={draftStructureTidyPrompt}>
+              整理结构
+            </button>
+          </div>
           <div className="chat-input">
             <textarea
               ref={chatTextRef}
