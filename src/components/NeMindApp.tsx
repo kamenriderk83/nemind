@@ -678,7 +678,8 @@ export default function NeMindApp() {
   }
 
   function draftActionDecisionPrompt() {
-    setChatInput("从当前图里提炼候选行动项和候选决策点，用普通节点表达，不要直接标记为行动或决策");
+    setChatInput("只分析当前导图，列出候选行动项和候选决策点，不要修改导图，也不要新增卡片。");
+    setIsChatOnlyMode(true);
     setRightTab("chat");
     window.setTimeout(() => chatTextRef.current?.focus(), 0);
   }

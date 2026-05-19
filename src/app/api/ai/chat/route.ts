@@ -26,14 +26,85 @@ export async function POST(request: Request) {
 
   const provider = createProvider(parsed.data.provider);
   const chatRequest = parsed.data as AiChatRequest;
-  const response = enforceManualOnlyActionDecisionKinds(
-    withDeterministicFallback(
-      await provider.chat(chatRequest),
+  const response = enforceMindmapRoot(
+    enforceManualOnlyActionDecisionKinds(
+      withDeterministicFallback(
+        await provider.chat(chatRequest),
+        chatRequest,
+      ),
       chatRequest,
     ),
     chatRequest,
   );
   return NextResponse.json(response);
+}
+
+function enforceMindmapRoot(
+  response: AiChatResponse,
+  request: AiChatRequest,
+): AiChatResponse {
+  if (request.chatOnly || !response.patch) return response;
+  if (!response.patch.operations.some((op) => op.type === "layoutGraph" && op.mode === "mindmap")) {
+    return response;
+  }
+
+  const nodes = new Map(request.document.nodes.map((node) => [node.id, node]));
+  const edges = new Set(request.document.edges.map((edge) => edgeKey(edge.source, edge.target)));
+
+  for (const operation of response.patch.operations) {
+    if (operation.type === "addNode" && operation.node.id) {
+      nodes.set(operation.node.id, {
+        id: operation.node.id,
+        type: "graphNode",
+        position: operation.node.position ?? { x: 0, y: 0 },
+        data: operation.node.data,
+      });
+    }
+    if (operation.type === "deleteNode") nodes.delete(operation.id);
+    if (operation.type === "addEdge") edges.add(edgeKey(operation.edge.source, operation.edge.target));
+    if (operation.type === "deleteEdge") {
+      const edge = request.document.edges.find((item) => item.id === operation.id);
+      if (edge) edges.delete(edgeKey(edge.source, edge.target));
+    }
+  }
+
+  const root = findSingleMindmapRoot([...nodes.values()], edges);
+  if (!root) return response;
+
+  const incoming = new Map([...nodes.keys()].map((id) => [id, 0]));
+  for (const key of edges) {
+    const [, target] = key.split("->");
+    incoming.set(target, (incoming.get(target) ?? 0) + 1);
+  }
+
+  const missingRootEdges: GraphPatchOperation[] = [];
+  for (const node of nodes.values()) {
+    if (node.id === root.id || (incoming.get(node.id) ?? 0) > 0) continue;
+    const key = edgeKey(root.id, node.id);
+    if (edges.has(key)) continue;
+    edges.add(key);
+    missingRootEdges.push({
+      type: "addEdge",
+      edge: {
+        id: `edge-${root.id}-${node.id}`,
+        source: root.id,
+        target: node.id,
+      },
+    });
+  }
+
+  if (!missingRootEdges.length) return response;
+  return {
+    ...response,
+    patch: {
+      ...response.patch,
+      operations: [
+        ...response.patch.operations.filter((op) => op.type !== "layoutGraph"),
+        ...missingRootEdges,
+        ...response.patch.operations.filter((op) => op.type === "layoutGraph"),
+      ],
+    },
+  };
 }
 
 function enforceManualOnlyActionDecisionKinds(
@@ -146,6 +217,26 @@ function isOrganizeIntent(message: string) {
 
 function isLayoutOnlyPatch(operations: GraphPatchOperation[]) {
   return operations.length > 0 && operations.every((op) => op.type === "layoutGraph");
+}
+
+function findSingleMindmapRoot(nodes: GraphNode[], edges: Set<string>) {
+  if (!nodes.length) return null;
+  const incoming = new Map(nodes.map((node) => [node.id, 0]));
+  const outgoing = new Map(nodes.map((node) => [node.id, 0]));
+  const order = new Map(nodes.map((node, index) => [node.id, index]));
+  for (const key of edges) {
+    const [source, target] = key.split("->");
+    incoming.set(target, (incoming.get(target) ?? 0) + 1);
+    outgoing.set(source, (outgoing.get(source) ?? 0) + 1);
+  }
+
+  return [...nodes].sort((a, b) => {
+    const aRoot = incoming.get(a.id) === 0 ? 1 : 0;
+    const bRoot = incoming.get(b.id) === 0 ? 1 : 0;
+    if (aRoot !== bRoot) return bRoot - aRoot;
+    if (aRoot === 1) return (order.get(a.id) ?? 0) - (order.get(b.id) ?? 0);
+    return (outgoing.get(b.id) ?? 0) - (outgoing.get(a.id) ?? 0);
+  })[0];
 }
 
 function buildOrganizeOperations(request: AiChatRequest): {
