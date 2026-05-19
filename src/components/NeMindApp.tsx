@@ -684,31 +684,6 @@ export default function NeMindApp() {
     window.setTimeout(() => chatTextRef.current?.focus(), 0);
   }
 
-  function draftNextLinePrompt() {
-    setChatInput(
-      selectedNodeIds.length
-        ? "沿着选中的节点继续，只展开下一条线或一个分支，最多新增 3 个节点。"
-        : "沿着当前导图继续，只展开下一条线或一个分支，最多新增 3 个节点。",
-    );
-    setIsChatOnlyMode(false);
-    setRightTab("chat");
-    window.setTimeout(() => chatTextRef.current?.focus(), 0);
-  }
-
-  function draftStructureTidyPrompt() {
-    setChatInput("重新整理当前导图结构：传统导图只保留一个中心主题，分支清晰连接，不新增无关内容。");
-    setIsChatOnlyMode(false);
-    setRightTab("chat");
-    window.setTimeout(() => chatTextRef.current?.focus(), 0);
-  }
-
-  function draftGrillMePrompt() {
-    setChatInput("Grill me：基于当前导图，尖锐追问我 5 个最关键的问题，逼我澄清假设、决策和下一步行动。不要修改导图。");
-    setIsChatOnlyMode(true);
-    setRightTab("chat");
-    window.setTimeout(() => chatTextRef.current?.focus(), 0);
-  }
-
   function newDocument() {
     const next = createSeedDocument();
     next.title = nextUntitledTitle(documents);
@@ -973,6 +948,11 @@ export default function NeMindApp() {
     const requestFocusedNodeIds = selectedNodeIds.length > 0
       ? selectedNodeIds
       : requestDocument.nodes.map((n) => n.id);
+    const isGrillMeRequest = isGrillMeIntent(message);
+    const effectiveChatOnly = isChatOnlyMode || isGrillMeRequest;
+    const effectiveMessage = isGrillMeRequest
+      ? `Grill me: 基于当前导图，尖锐追问我 5 个最关键的问题，逼我澄清假设、决策和下一步行动。不要修改导图。\n\n${message}`
+      : message;
     const userMessage = {
       id: makeId("msg"),
       role: "user" as const,
@@ -1009,11 +989,11 @@ export default function NeMindApp() {
           model: selectedModel.model,
           reasoningEffort,
           customProvider: selectedModel.customProvider,
-          message,
+          message: effectiveMessage,
           document: requestDocument,
           recentMessages: requestDocument.messages.slice(-8),
           focusedNodeIds: requestFocusedNodeIds,
-          chatOnly: isChatOnlyMode,
+          chatOnly: effectiveChatOnly,
         }),
       });
       const result = (await response.json()) as AiChatResponse;
@@ -1681,17 +1661,6 @@ export default function NeMindApp() {
               已选中 {selectedNodeIds.length} 个节点，提问将聚焦于它们
             </div>
           ) : null}
-          <div className="line-actions">
-            <button type="button" onClick={draftNextLinePrompt}>
-              下一条线
-            </button>
-            <button type="button" onClick={draftStructureTidyPrompt}>
-              整理结构
-            </button>
-            <button type="button" onClick={draftGrillMePrompt}>
-              Grill me
-            </button>
-          </div>
           <div className="chat-input">
             <textarea
               ref={chatTextRef}
@@ -2330,6 +2299,11 @@ function getDocumentStats(document: GraphDocument | null) {
 function projectStatsLine(document: GraphDocument) {
   const stats = getDocumentStats(document);
   return `${stats.total} nodes · 行动 ${stats.actions} · 决策 ${stats.decisions}`;
+}
+
+function isGrillMeIntent(message: string) {
+  const text = message.trim().toLowerCase();
+  return /\bgrill\s*me\b|\bgrillme\b|拷问我|追问我|挑战我|质疑我|盘问我/.test(text);
 }
 
 function reasoningLabel(value: ReasoningEffort) {
