@@ -186,7 +186,10 @@ function inferGraphShape(request: AiChatRequest) {
 
 function inferUserIntent(message: string) {
   const text = message.trim().toLowerCase();
-  if (/^(整理|排版|布局|layout|arrange|clean up|organize)$/.test(text)) {
+  if (
+    /整理|重新整理|重整|排版|布局|优化布局|梳理|收拾|归整/.test(text) ||
+    /\b(layout|arrange|clean up|organize|reorganize|re-layout)\b/.test(text)
+  ) {
     return "re-layout and tidy the existing graph; avoid adding unrelated content";
   }
   if (/继续|补充|细一点|展开|more|continue|expand/.test(text)) {
@@ -446,7 +449,6 @@ function parseModelContent(content: string): AiChatResponse {
   // 5. Return raw content - no structured patch
   return {
     reply: content,
-    error: "AI 没有返回可执行的图谱变更。我会尽量使用本地规则兜底处理明确操作。",
   };
 }
 

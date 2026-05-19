@@ -167,7 +167,7 @@ function withDeterministicFallback(
     const fallback = buildFallbackPatch(request);
     if (
       fallback?.patch &&
-      (!response.patch || isLayoutOnlyPatch(response.patch.operations))
+      (!response.patch || isNonStructuralOrganizePatch(response.patch.operations))
     ) {
       return {
         reply: fallback.reply,
@@ -210,13 +210,22 @@ function buildFallbackPatch(request: AiChatRequest): AiChatResponse | null {
 }
 
 function isOrganizeIntent(message: string) {
-  return /^(整理|排版|布局|layout|arrange|organize|clean up)$/.test(
-    message.trim().toLowerCase(),
+  const text = message.trim().toLowerCase();
+  return (
+    /整理|重新整理|重整|排版|布局|优化布局|梳理|收拾|归整/.test(text) ||
+    /\b(layout|arrange|organize|clean up|reorganize|re-layout)\b/.test(text)
   );
 }
 
-function isLayoutOnlyPatch(operations: GraphPatchOperation[]) {
-  return operations.length > 0 && operations.every((op) => op.type === "layoutGraph");
+function isNonStructuralOrganizePatch(operations: GraphPatchOperation[]) {
+  return (
+    operations.length === 0 ||
+    operations.every((op) =>
+      op.type === "layoutGraph" ||
+      op.type === "explain" ||
+      op.type === "setSelection"
+    )
+  );
 }
 
 function findSingleMindmapRoot(nodes: GraphNode[], edges: Set<string>) {
@@ -303,9 +312,9 @@ function buildOrganizeOperations(request: AiChatRequest): {
 
   for (const edge of request.document.edges) {
     const shouldRetireWeakEdge =
-      activeNodes.length > 4 &&
       !desiredKeys.has(edgeKey(edge.source, edge.target)) &&
-      isWeakInferredEdge(edge, activeNodes, activeEdges, mode);
+      (mode === "mindmap" ||
+        (activeNodes.length > 4 && isWeakInferredEdge(edge, activeNodes, activeEdges, mode)));
     if (
       edge.source === edge.target ||
       duplicateIds.has(edge.source) ||
