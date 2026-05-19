@@ -27,9 +27,12 @@ export async function POST(request: Request) {
   const provider = createProvider(parsed.data.provider);
   const chatRequest = parsed.data as AiChatRequest;
   const response = enforceMindmapRoot(
-    enforceManualOnlyActionDecisionKinds(
-      withDeterministicFallback(
-        await provider.chat(chatRequest),
+    enforceLineByLineGeneration(
+      enforceManualOnlyActionDecisionKinds(
+        withDeterministicFallback(
+          await provider.chat(chatRequest),
+          chatRequest,
+        ),
         chatRequest,
       ),
       chatRequest,
@@ -37,6 +40,46 @@ export async function POST(request: Request) {
     chatRequest,
   );
   return NextResponse.json(response);
+}
+
+function enforceLineByLineGeneration(
+  response: AiChatResponse,
+  request: AiChatRequest,
+): AiChatResponse {
+  if (request.chatOnly || !response.patch) return response;
+  if (isOrganizeIntent(request.message)) return response;
+
+  const maxAddedNodes = isCompleteMapRequest(request.message) ? 8 : 4;
+  const addNodeOps = response.patch.operations.filter((op) => op.type === "addNode");
+  if (addNodeOps.length <= maxAddedNodes) return response;
+
+  const keptNodeIds = new Set(
+    addNodeOps
+      .slice(0, maxAddedNodes)
+      .map((op) => op.node.id)
+      .filter((id): id is string => Boolean(id)),
+  );
+  const existingNodeIds = new Set(request.document.nodes.map((node) => node.id));
+
+  const operations = response.patch.operations.filter((op) => {
+    if (op.type === "addNode") return !op.node.id || keptNodeIds.has(op.node.id);
+    if (op.type !== "addEdge") return true;
+    const sourceIsNew = !existingNodeIds.has(op.edge.source);
+    const targetIsNew = !existingNodeIds.has(op.edge.target);
+    if (sourceIsNew && !keptNodeIds.has(op.edge.source)) return false;
+    if (targetIsNew && !keptNodeIds.has(op.edge.target)) return false;
+    return true;
+  });
+
+  return {
+    ...response,
+    reply: `${response.reply}\n\n我先保留这一条主线，其他分支可以继续逐条展开。`,
+    patch: {
+      ...response.patch,
+      summary: `${response.patch.summary} Kept one line for step-by-step expansion.`,
+      operations,
+    },
+  };
 }
 
 function enforceMindmapRoot(
@@ -215,6 +258,11 @@ function isOrganizeIntent(message: string) {
     /整理|重新整理|重整|排版|布局|优化布局|梳理|收拾|归整/.test(text) ||
     /\b(layout|arrange|organize|clean up|reorganize|re-layout)\b/.test(text)
   );
+}
+
+function isCompleteMapRequest(message: string) {
+  const text = message.trim().toLowerCase();
+  return /完整|全面|全部|所有|完整导图|完整流程|complete|full|whole|entire|exhaustive/.test(text);
 }
 
 function isNonStructuralOrganizePatch(operations: GraphPatchOperation[]) {

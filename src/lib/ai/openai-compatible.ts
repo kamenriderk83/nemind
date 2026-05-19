@@ -193,7 +193,7 @@ function inferUserIntent(message: string) {
     return "re-layout and tidy the existing graph; avoid adding unrelated content";
   }
   if (/继续|补充|细一点|展开|more|continue|expand/.test(text)) {
-    return "extend the current graph with the next useful missing nodes and edges";
+    return "extend the current graph with the next single useful line or branch only";
   }
   if (/太乱|简化|精简|少一点|simplify|reduce/.test(text)) {
     return "simplify the graph by merging/removing weak or redundant structure";
@@ -204,7 +204,7 @@ function inferUserIntent(message: string) {
   if (/解释|说明|怎么看|分析|why|explain/.test(text)) {
     return "answer and optionally add explanatory notes only if useful";
   }
-  return "infer from the message and current graph; make a concrete useful graph change when appropriate";
+  return "infer from the message and current graph; make one concrete line-by-line graph change when appropriate";
 }
 
 function createChatRequestBody({
